@@ -1,2 +1,4 @@
 # rafty
-An open source raft controller
+Rafty is an raft controller utilizing:
+## Add the hardware here.
+

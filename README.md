@@ -1,6 +1,6 @@
 # Rafty - The raft controller
 
-Rafty is an raft controller utilizing a set of commonly available hardware and customized software. The vision of the project is to offer **an low cost and open source** solution to control your rafts heading and motor speed at first.
+Rafty is an raft controller utilizing a set of commonly available hardware and customized software. The vision of the project is to offer **an low cost and open source** solution to control your rafts heading and motor speed at first hand.
 
 ### Current state
  The first version of the controller is under work. I'm currently working on the manual steering.

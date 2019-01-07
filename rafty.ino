@@ -7,39 +7,43 @@ Mikael Hirn
 mikael.hirn@gmail.com
 www.raftycontroller.com
 
-
+Oled display size is 128x64px.
 
 Userd libraries:
-Adafruit SH1106 - https://github.com/wonho-maker/Adafruit_SH1106
-Adafruit GFX - https://github.com/adafruit/Adafruit-GFX-Library
-Jarzebski, HMC5883L - https://github.com/jarzebski/Arduino-HMC5883L
-Paul Stoffregen, Encoder - https://github.com/PaulStoffregen/Encoder
+Oled display - Adafruit SH1106 - https://github.com/wonho-maker/Adafruit_SH1106
+Graphics - Adafruit GFX - https://github.com/adafruit/Adafruit-GFX-Library
+Compass - Jarzebski, HMC5883L - https://github.com/jarzebski/Arduino-HMC5883L
+Rotary ncoder - Paul Stoffregen, Encoder - https://github.com/PaulStoffregen/Encoder
 
 
 ************************************/
+//Libraries ========================================
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH1106.h>
-//#include <HMC5883L.h>
 #include <Encoder.h>
+//#include <HMC5883L.h>
 
-//HMC5883L compass;
-
-Encoder encMainMotor(2, 3); 
-
+//Initialize ========================================
+Encoder encMainMotor(2, 3);
+Encoder encRudder(4, 5); 
 #define OLED_RESET 4
 Adafruit_SH1106 display(OLED_RESET);
+//HMC5883L compass;
 
-//Pins
+//Pins ==============================================
 int rudderPin = A0;
 int beepPin = 4;
 
 
-//Variables
+//Variables =========================================
 int rudder = 0;
 long oldPosMainMotor = -999;
+long oldPosRudd = 0;
+int barStart = 0;
+int barLen = 0;
 
-//Set default mode
+  //Set default mode
   int driveMode = 0; //0 = Rudder, 1 = Compass, 2 = GPS
 
 //Functions
@@ -63,7 +67,7 @@ long oldPosMainMotor = -999;
     delay(100);
   }
 
-//Draw given header to the display
+  //Draw given header to the display
   void drawHeader(int givenHeader){
         display.fillRect(0,0,128,11,1);
         display.setTextSize(1);
@@ -96,11 +100,11 @@ long oldPosMainMotor = -999;
 void setup() {
 Serial.begin(9600);
   
-//Configure Pins
-pinMode(beepPin, OUTPUT);
-digitalWrite(beepPin, HIGH);
+  //Configure Pins
+  pinMode(beepPin, OUTPUT);
+  digitalWrite(beepPin, HIGH);
 
-//Init display (Def I2C address: 0x3C, Mega2560 20 (SDA), 21(SCL))
+  //Init display (Def I2C address: 0x3C, Mega2560 20 (SDA), 21(SCL))
   display.begin(SH1106_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x64)
   display.clearDisplay();
   display.display();
@@ -112,14 +116,14 @@ digitalWrite(beepPin, HIGH);
   display.setCursor(55, 40);
   display.print("v0.1");
   display.display();
-  beep();
-  delay(2000);
+  //beep();
+  delay(500);
   display.clearDisplay();
   display.display();
 
 
-//Init compass
- /* display.setTextSize(1);
+  //Init compass
+  /* display.setTextSize(1);
   display.setCursor(27, 30);
   display.print("Compass init..");
   display.display();
@@ -138,19 +142,19 @@ digitalWrite(beepPin, HIGH);
 }
 
 void loop() {
+
+//Main motor position
 long newPosMainMotor = encMainMotor.read();
 if(newPosMainMotor != oldPosMainMotor){
   oldPosMainMotor = newPosMainMotor;
   Serial.println(newPosMainMotor);
 }
   
-//Read encoder
-
 
 //Which drive mode is selected?
 switch (driveMode){
   case 0:
-      //Read rudder
+      //Read rudder (Pot)
       rudder = analogRead(rudderPin);
       rudder = map(rudder, 0,1023,0,90);
       
@@ -169,6 +173,16 @@ switch (driveMode){
           display.print("0");
         }
         display.print(rudder);
+        
+        barStart = rudder + 19;
+        barLen = 64 - rudder;
+        //Fill the bar with white and half of the bar with blank
+        display.fillRect(0,57,128,2,1);
+        display.fillRect(64,57,64,2,0);
+        
+        //Fill the blank part
+        display.fillRect(0,57,barLen,2,0);
+        
       }
       else if(rudder < 44)
       {
@@ -179,11 +193,22 @@ switch (driveMode){
           display.print("0");
         }
         display.print(rudder);
+
+        barStart = rudder + 64;
+        
+        //Fill the bar with white and half of the bar with blank
+        display.fillRect(0,57,128,2,1);
+        display.fillRect(0,57,64,2,0);
+        
+        //Fill the blank part
+        display.fillRect(barStart,57,64,2,0);
       }
       else
       {
         display.print("000");
+        display.fillRect(0,57,128,2,1);
       }
+      
       
       
       /*

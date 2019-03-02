@@ -9,12 +9,11 @@ www.raftycontroller.com
 
 Oled display size is 128x64px.
 
-Userd libraries:
+Used libraries:
 Oled display - Adafruit SH1106 - https://github.com/wonho-maker/Adafruit_SH1106
 Graphics - Adafruit GFX - https://github.com/adafruit/Adafruit-GFX-Library
 Compass - Jarzebski, HMC5883L - https://github.com/jarzebski/Arduino-HMC5883L
 Rotary ncoder - Paul Stoffregen, Encoder - https://github.com/PaulStoffregen/Encoder
-
 
 ************************************/
 //Libraries ========================================
@@ -26,22 +25,31 @@ Rotary ncoder - Paul Stoffregen, Encoder - https://github.com/PaulStoffregen/Enc
 
 //Initialize ========================================
 Encoder encMainMotor(2, 3);
-Encoder encRudder(4, 5); 
 #define OLED_RESET 4
 Adafruit_SH1106 display(OLED_RESET);
 //HMC5883L compass;
 
 //Pins ==============================================
-int rudderPin = A0;
-int beepPin = 4;
+#define rudderPin A0
+#define beepPin 4
+#define motorpwm  5
+#define motordira  6
+#define motordirb 7
+
 
 
 //Variables =========================================
-int rudder = 0;
-long oldPosMainMotor = -999;
-long oldPosRudd = 0;
+double rudder = 0;
+int oldPosMainMotor = -999;
+int oldPosRudd = 0;
 int barStart = 0;
 int barLen = 0;
+int turnSpeed = 0;
+int calc = 0;
+int maxTurnSteps = 500; //The amount or steps from hard stop to hard stop.
+double half = ((maxTurnSteps / 2)); //The center point of the rudder.
+int fromCenter = 0;
+int rudderScaled = 0;
 
   //Set default mode
   int driveMode = 0; //0 = Rudder, 1 = Compass, 2 = GPS
@@ -95,6 +103,41 @@ int barLen = 0;
         
   }
 
+  void turnMotorTo(double rudd) {
+    
+    //Calculate the difference between set and desired rudder
+    Serial.write("ruddIN: ");
+    Serial.println(rudd);
+    
+    calc = encMainMotor.read()-rudd;
+    
+    Serial.write("Calc: ");
+    Serial.println(calc);
+    if(calc > 10) {
+      digitalWrite(motordira, LOW);
+      digitalWrite(motordirb, HIGH);
+    }else if(calc < -10){
+      digitalWrite(motordira, HIGH);
+      digitalWrite(motordirb, LOW);
+    }else{
+      digitalWrite(motordira, LOW);
+      digitalWrite(motordirb, LOW);
+    }
+
+    //Set the motor speed, you need to set your threshold for  
+    
+      if(abs(calc) < maxTurnSteps){
+        turnSpeed = map(abs(calc),0,maxTurnSteps,170,255);
+      }else{
+        turnSpeed = 255;
+      }
+ 
+    Serial.write("turnSpeed: ");
+    Serial.println(turnSpeed);        
+    analogWrite(motorpwm, turnSpeed);
+ 
+  }
+
 
 
 void setup() {
@@ -103,6 +146,12 @@ Serial.begin(9600);
   //Configure Pins
   pinMode(beepPin, OUTPUT);
   digitalWrite(beepPin, HIGH);
+  pinMode(motorpwm, OUTPUT);
+  digitalWrite(motorpwm, LOW);
+  pinMode(motordira, OUTPUT);
+  pinMode(motordirb, OUTPUT);
+  digitalWrite(motordira, HIGH);
+  digitalWrite(motordirb, HIGH);
 
   //Init display (Def I2C address: 0x3C, Mega2560 20 (SDA), 21(SCL))
   display.begin(SH1106_SWITCHCAPVCC, 0x3C);  // initialize with the I2C addr 0x3C (for the 128x64)
@@ -121,7 +170,6 @@ Serial.begin(9600);
   display.clearDisplay();
   display.display();
 
-
   //Init compass
   /* display.setTextSize(1);
   display.setCursor(27, 30);
@@ -137,78 +185,75 @@ Serial.begin(9600);
 
 //Home motor
 
-
-
 }
 
 void loop() {
-
+delay(200);
+Serial.println("**************");
 //Main motor position
-long newPosMainMotor = encMainMotor.read();
+int newPosMainMotor = encMainMotor.read();
 if(newPosMainMotor != oldPosMainMotor){
   oldPosMainMotor = newPosMainMotor;
-  Serial.println(newPosMainMotor);
 }
+Serial.write("mainMotorPos: ");
+Serial.println(newPosMainMotor);
   
+//Draw screen header
+drawHeader(driveMode);
 
 //Which drive mode is selected?
 switch (driveMode){
   case 0:
       //Read rudder (Pot)
-      rudder = analogRead(rudderPin);
-      rudder = map(rudder, 0,1023,0,90);
+      rudder = map(analogRead(rudderPin),0,1023,0,maxTurnSteps);
+      Serial.write("Rudder pot: ");
+      Serial.println(rudder);
       
-      drawHeader(0);
       
-      display.setTextColor(1, 0);
-      display.setTextSize(3);
-      display.setCursor(40, 30);
-      
-      if(rudder > 46)
+  
+      if(rudder > (half+3)) //rudder left
       {
-        rudder = rudder - 45;
-        display.print("L");
-        if(rudder < 10)
-        {
-          display.print("0");
-        }
-        display.print(rudder);
         
-        barStart = rudder + 19;
-        barLen = 64 - rudder;
+      //Draw bar to display ********************************
+        fromCenter = rudder - half;
+        rudderScaled=map(fromCenter,0,half,0,64);
+        barStart = rudderScaled + 19;
+        barLen = 64 - rudderScaled;
+        
         //Fill the bar with white and half of the bar with blank
-        display.fillRect(0,57,128,2,1);
-        display.fillRect(64,57,64,2,0);
+        display.fillRect(0,30,128,30,1);
+        display.fillRect(64,30,64,30,0);
         
         //Fill the blank part
-        display.fillRect(0,57,barLen,2,0);
-        
+        display.fillRect(0,30,barLen,30,0);
+      //****************************************************
+       
       }
-      else if(rudder < 44)
+      else if(rudder < (half-3)) //rudder right
       {
-        rudder = 45 - rudder;
-        display.print("R");
-        if(rudder < 10)
-        {
-          display.print("0");
-        }
-        display.print(rudder);
-
-        barStart = rudder + 64;
+        
+        
+        fromCenter = half - rudder;
+        rudderScaled=map(fromCenter,0,half,0,64);
+        barStart = rudderScaled + 64;
         
         //Fill the bar with white and half of the bar with blank
-        display.fillRect(0,57,128,2,1);
-        display.fillRect(0,57,64,2,0);
+        display.fillRect(0,30,128,30,1);
+        display.fillRect(0,30,64,30,0);
         
         //Fill the blank part
-        display.fillRect(barStart,57,64,2,0);
+        display.fillRect(barStart,30,64,30,0);
+       
       }
       else
       {
-        display.print("000");
-        display.fillRect(0,57,128,2,1);
+        display.fillRect(0,30,128,30,0);
+        display.fillCircle(64, 40, 10, 1);
+        
       }
-      
+
+      //Turn motor
+      turnMotorTo(rudder);
       
       
       /*
@@ -233,9 +278,7 @@ switch (driveMode){
 
     break;
 
-  case 1:
-      drawHeader(1);
-      
+  case 1:  
       display.setTextColor(1, 0);
       
       display.setCursor(32, 20);
@@ -257,7 +300,6 @@ switch (driveMode){
     break;
 
   case 2:
-      drawHeader(2);
 
     break;
 }

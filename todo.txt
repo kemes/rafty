@@ -1,2 +1,0 @@
--siirrä potikka kytkentälevylle.
--moottorin min threshold pwm -> koska moottori lähtee liikkeelle.
